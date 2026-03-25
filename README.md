@@ -18,5 +18,7 @@ cd examples
 go run all.go
 
 go run viewer.go list
+
 go run viewer.go info hello.go
+
 go run viewer.go view hello.go
