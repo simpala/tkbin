@@ -1,0 +1,3 @@
+More random documentation.
+This is the second page in the random_docs folder.
+Key should be "random_docs/page2.txt".

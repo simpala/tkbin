@@ -1,0 +1,2 @@
+This is a flat file without a folder.
+It should have a key like "flat.txt" in the JSON.

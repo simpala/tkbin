@@ -1,0 +1,3 @@
+This is documentation for the random project.
+It lives in the random_docs folder.
+The JSON key should be "random_docs/intro.txt".

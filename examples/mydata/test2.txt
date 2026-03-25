@@ -1,0 +1,4 @@
+Second file with more content.
+This file should be different enough from the first one.
+Let's see how the indexing handles multiple files in the same library.
+We are testing the compression and random access capabilities.

@@ -1,0 +1,4 @@
+Hello World! This is a test file for the qwens_tools project.
+It demonstrates the indexing strategy where files are tokenized,
+packed into 4-token blocks called "Pixels", and stored in a binary buffer.
+The metadata tracks the start pixel and length for each file.
