@@ -57,6 +57,14 @@ func Open(binPath, jsonPath string) (*Library, error) {
 	return &Library{Index: index, BinFile: f, Encoder: tkm}, nil
 }
 
+//Close 
+func (l *Library) Close() error {
+    if l.BinFile != nil {
+        return l.BinFile.Close()
+    }
+    return nil
+}
+
 // GetContent retrieves and decodes the full text for a given key using ReadAt
 func (l *Library) GetContent(key string) (string, error) {
 	entry, ok := l.Index[key]
