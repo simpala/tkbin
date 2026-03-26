@@ -7,7 +7,7 @@ Key Features:
 
 Pixel-Aligned: 8-byte fixed-width records for O(1) seek times.
 
-Metadata-Rich: Tag files with language, category, or AI-generated summaries in a portable JSON index.
+Metadata-Rich: Tag files with language, category, or user-defined custom entries in a portable JSON index for fast lookups.
 
 Searchable: Direct binary search on token sequences.
 
