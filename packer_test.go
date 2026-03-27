@@ -15,14 +15,14 @@ func ExampleNewPacker() {
 
 	fmt.Printf("Packer initialized: %v\n", packer != nil)
 	fmt.Printf("Library initialized: %v\n", packer.Library != nil)
-	fmt.Printf("Encoder initialized: %v\n", packer.Library.Encoder != nil)
-	fmt.Printf("Initial ImageArray length: %d\n", len(packer.ImageArray))
+	fmt.Printf("Tokenizer initialized: %v\n", packer.Library.Tokenizer != nil)
+	fmt.Printf("Initial ImageData length: %d\n", len(packer.ImageData))
 
 	// Output:
 	// Packer initialized: true
 	// Library initialized: true
-	// Encoder initialized: true
-	// Initial ImageArray length: 0
+	// Tokenizer initialized: true
+	// Initial ImageData length: 0
 }
 
 // ExamplePacker_AddFile demonstrates adding multiple files with 

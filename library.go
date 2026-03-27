@@ -1,29 +1,33 @@
 package tkbin
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
-	"bytes"
-
-	"github.com/pkoukk/tiktoken-go"
 )
 
-type TokenPixel [4]uint16
+// TokenPixel is kept for logical structure but we handle it via byte offsets
+// type TokenPixel [4]uint16 (Legacy)
 
 type FileEntry struct {
 	PixelStart  int               `json:"pixel_start"`
 	PixelLength int               `json:"pixel_length"`
 	TokenCount  int               `json:"token_count"`
-	Metadata    map[string]string `json:"metadata,omitempty"` // New field
+	Metadata    map[string]string `json:"metadata,omitempty"`
+}
+
+type LibraryIndex struct {
+	Tokenizer string               `json:"tokenizer"`
+	Files     map[string]FileEntry `json:"files"`
 }
 
 type Library struct {
-	Index   map[string]FileEntry
-	BinFile *os.File
-	Encoder *tiktoken.Tiktoken
+	Index     map[string]FileEntry
+	BinFile   *os.File
+	Tokenizer Tokenizer
 }
 
 type SearchResult struct {
@@ -34,18 +38,27 @@ type SearchResult struct {
 
 // Open loads the metadata and opens the binary file for reading
 func Open(binPath, jsonPath string) (*Library, error) {
-	tkm, err := tiktoken.GetEncoding("r50k_base")
-	if err != nil {
-		return nil, err
-	}
-
 	metaBytes, err := os.ReadFile(jsonPath)
 	if err != nil {
 		return nil, err
 	}
 
-	var index map[string]FileEntry
-	if err := json.Unmarshal(metaBytes, &index); err != nil {
+	var libIndex LibraryIndex
+	if err := json.Unmarshal(metaBytes, &libIndex); err != nil {
+		// Attempt to parse legacy format where the top level was the map
+		var legacyIndex map[string]FileEntry
+		if errLegacy := json.Unmarshal(metaBytes, &legacyIndex); errLegacy == nil {
+			libIndex = LibraryIndex{
+				Tokenizer: "r50k_base",
+				Files:     legacyIndex,
+			}
+		} else {
+			return nil, err
+		}
+	}
+
+	tkm, err := getTokenizer(libIndex.Tokenizer)
+	if err != nil {
 		return nil, err
 	}
 
@@ -54,7 +67,7 @@ func Open(binPath, jsonPath string) (*Library, error) {
 		return nil, err
 	}
 
-	return &Library{Index: index, BinFile: f, Encoder: tkm}, nil
+	return &Library{Index: libIndex.Files, BinFile: f, Tokenizer: tkm}, nil
 }
 
 //Close 
@@ -72,12 +85,13 @@ func (l *Library) GetContent(key string) (string, error) {
 		return "", fmt.Errorf("key not found: %s", key)
 	}
 
-	const pixelSize = 8
+	tokenSize := l.Tokenizer.TokenSize()
+	pixelSize := int64(tokenSize * 4)
 	offset := int64(entry.PixelStart) * pixelSize
-	length := entry.PixelLength * pixelSize
-	
+	length := int64(entry.PixelLength) * pixelSize
+
 	pixelData := make([]byte, length)
-	
+
 	// ReadAt is thread-safe and doesn't require a Seek call
 	_, err := l.BinFile.ReadAt(pixelData, offset)
 	if err != nil {
@@ -85,58 +99,65 @@ func (l *Library) GetContent(key string) (string, error) {
 	}
 
 	tokens := make([]int, 0, entry.TokenCount)
-	for i := 0; i < len(pixelData); i += 2 {
-		val := binary.LittleEndian.Uint16(pixelData[i : i+2])
-		// We only append if the value is non-zero or within our token count
-		// to respect the padding you added in Packer
+	for i := 0; i < len(pixelData); i += tokenSize {
+		var val int
+		if tokenSize == 4 {
+			val = int(binary.LittleEndian.Uint32(pixelData[i : i+4]))
+		} else {
+			val = int(binary.LittleEndian.Uint16(pixelData[i : i+2]))
+		}
+
 		if len(tokens) < entry.TokenCount {
-			tokens = append(tokens, int(val))
+			tokens = append(tokens, val)
 		}
 	}
 
-	return l.Encoder.Decode(tokens), nil
+	return l.Tokenizer.Decode(tokens), nil
 }
 
 func (l *Library) Search(query string, contextChars int) []SearchResult {
-	// 1. Define the variants to test
 	variants := []string{
-		query,           // "sample"
-		" " + query,     // " sample"
-		query + " ",     // "sample "
+		query,       // "sample"
+		" " + query, // " sample"
+		query + " ", // "sample "
 	}
 
 	var allResults []SearchResult
 	seenFiles := make(map[string]bool)
+	tokenSize := l.Tokenizer.TokenSize()
+	pixelSize := int64(tokenSize * 4)
 
 	for _, v := range variants {
-		queryTokens := l.Encoder.Encode(v, nil, nil)
+		queryTokens := l.Tokenizer.Encode(v)
 		if len(queryTokens) == 0 {
 			continue
 		}
 
 		// Convert tokens to bytes for binary matching
-		queryBytes := make([]byte, len(queryTokens)*2)
+		queryBytes := make([]byte, len(queryTokens)*tokenSize)
 		for i, t := range queryTokens {
-			binary.LittleEndian.PutUint16(queryBytes[i*2:], uint16(t))
+			if tokenSize == 4 {
+				binary.LittleEndian.PutUint32(queryBytes[i*4:], uint32(t))
+			} else {
+				binary.LittleEndian.PutUint16(queryBytes[i*2:], uint16(t))
+			}
 		}
 
 		for key, entry := range l.Index {
-			// Skip if we already found a match for this file in a previous variant
 			if seenFiles[key] {
 				continue
 			}
 
-			pixelData := make([]byte, entry.PixelLength*8)
-			_, err := l.BinFile.ReadAt(pixelData, int64(entry.PixelStart)*8)
+			pixelData := make([]byte, int64(entry.PixelLength)*pixelSize)
+			_, err := l.BinFile.ReadAt(pixelData, int64(entry.PixelStart)*pixelSize)
 			if err != nil {
 				continue
 			}
 
 			if idx := bytes.Index(pixelData, queryBytes); idx != -1 {
 				content, _ := l.GetContent(key)
-				// Use case-insensitive string search for the snippet location
 				charIdx := strings.Index(strings.ToLower(content), strings.ToLower(query))
-				
+
 				if charIdx != -1 {
 					start := max(0, charIdx-contextChars)
 					end := min(len(content), charIdx+len(query)+contextChars)
