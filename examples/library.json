@@ -1,0 +1,93 @@
+{
+  "tokenizer": "r50k_base",
+  "files": {
+    "flat.txt": {
+      "pixel_start": 0,
+      "pixel_length": 7,
+      "token_count": 26,
+      "metadata": {
+        "category": "documentation",
+        "extension": ".txt",
+        "language": "Plain Text",
+        "size_bytes": "88"
+      }
+    },
+    "hello.go": {
+      "pixel_start": 7,
+      "pixel_length": 8,
+      "token_count": 32,
+      "metadata": {
+        "category": "source_code",
+        "extension": ".go",
+        "language": "Go",
+        "size_bytes": "77"
+      }
+    },
+    "random_docs/intro.txt": {
+      "pixel_start": 15,
+      "pixel_length": 9,
+      "token_count": 35,
+      "metadata": {
+        "category": "documentation",
+        "extension": ".txt",
+        "language": "Plain Text",
+        "size_bytes": "130"
+      }
+    },
+    "random_docs/page2.txt": {
+      "pixel_start": 24,
+      "pixel_length": 8,
+      "token_count": 32,
+      "metadata": {
+        "category": "documentation",
+        "extension": ".txt",
+        "language": "Plain Text",
+        "size_bytes": "117"
+      }
+    },
+    "readme.txt": {
+      "pixel_start": 32,
+      "pixel_length": 8,
+      "token_count": 30,
+      "metadata": {
+        "category": "documentation",
+        "extension": ".txt",
+        "language": "Plain Text",
+        "size_bytes": "102"
+      }
+    },
+    "sample.txt": {
+      "pixel_start": 40,
+      "pixel_length": 4,
+      "token_count": 14,
+      "metadata": {
+        "category": "documentation",
+        "extension": ".txt",
+        "language": "Plain Text",
+        "size_bytes": "57"
+      }
+    },
+    "test1.txt": {
+      "pixel_start": 44,
+      "pixel_length": 16,
+      "token_count": 63,
+      "metadata": {
+        "category": "documentation",
+        "extension": ".txt",
+        "language": "Plain Text",
+        "size_bytes": "264"
+      }
+    },
+    "test2.txt": {
+      "pixel_start": 60,
+      "pixel_length": 12,
+      "token_count": 46,
+      "metadata": {
+        "category": "documentation",
+        "extension": ".txt",
+        "language": "Plain Text",
+        "size_bytes": "222"
+      }
+    }
+  }
+}
