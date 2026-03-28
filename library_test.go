@@ -50,3 +50,64 @@ func ExampleLibrary_Search() {
 	// Found in: fox.txt
 	// Snippet: uick brown fox jump
 }
+
+// ExampleLibrary_Retrieve demonstrates the BM25 search functionality
+// with metadata filtering and custom boosting.
+func ExampleLibrary_Retrieve() {
+	binPath, jsonPath := "retrieve.bin", "retrieve.json"
+	packer, _ := NewPacker()
+
+	packer.AddFile("go_code.go", []byte("package main\nfunc main() { fmt.Println(\"hello\") }"), map[string]string{
+		"language": "Go",
+		"category": "source_code",
+	})
+
+	packer.AddFile("python_code.py", []byte("print(\"hello\")"), map[string]string{
+		"language": "Python",
+	})
+
+	packer.AddFile("readme.txt", []byte("This is a hello world guide."), map[string]string{
+		"category": "documentation",
+	})
+
+	packer.Save(binPath, jsonPath)
+	defer os.Remove(binPath)
+	defer os.Remove(jsonPath)
+
+	lib, _ := Open(binPath, jsonPath)
+	defer lib.BinFile.Close()
+
+	// Search for "hello" in Go source code
+	opts := RetrieveOptions{
+		MetaFilter: map[string]any{
+			"language": "Go",
+		},
+		Limit:        5,
+		ContextChars: 10,
+	}
+
+	results := lib.Retrieve("hello", opts)
+	for _, r := range results {
+		if r.Score > 0 {
+			fmt.Printf("Key: %s, Found\n", r.Key)
+		}
+	}
+
+	// Search for "hello" with a boost for documentation
+	optsBoost := RetrieveOptions{
+		Limit: 5,
+		Boost: func(key string, metadata map[string]string) float64 {
+			if metadata["category"] == "documentation" {
+				return 1.0
+			}
+			return 0.0
+		},
+	}
+
+	resultsBoost := lib.Retrieve("hello", optsBoost)
+	fmt.Println("Top result with boost:", resultsBoost[0].Key)
+
+	// Output:
+	// Key: go_code.go, Found
+	// Top result with boost: readme.txt
+}
