@@ -115,6 +115,41 @@ func (l *Library) GetContent(key string) (string, error) {
 	return l.Tokenizer.Decode(tokens), nil
 }
 
+// GetTokens retrieves the token IDs for a given key directly from the binary file.
+func (l *Library) GetTokens(key string) ([]int, error) {
+	entry, ok := l.Index[key]
+	if !ok {
+		return nil, fmt.Errorf("key not found: %s", key)
+	}
+
+	tokenSize := l.Tokenizer.TokenSize()
+	pixelSize := int64(tokenSize * 4)
+	offset := int64(entry.PixelStart) * pixelSize
+	length := int64(entry.PixelLength) * pixelSize
+
+	pixelData := make([]byte, length)
+
+	_, err := l.BinFile.ReadAt(pixelData, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	tokens := make([]int, 0, entry.TokenCount)
+	for i := 0; i < len(pixelData); i += tokenSize {
+		var val int
+		if tokenSize == 4 {
+			val = int(binary.LittleEndian.Uint32(pixelData[i : i+4]))
+		} else {
+			val = int(binary.LittleEndian.Uint16(pixelData[i : i+2]))
+		}
+
+		if len(tokens) < entry.TokenCount {
+			tokens = append(tokens, val)
+		}
+	}
+	return tokens, nil
+}
+
 func (l *Library) Search(query string, contextChars int) []SearchResult {
 	variants := []string{
 		query,       // "sample"
