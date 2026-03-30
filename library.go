@@ -28,6 +28,8 @@ type Library struct {
 	Index     map[string]FileEntry
 	BinFile   *os.File
 	Tokenizer Tokenizer
+	binPath   string
+	jsonPath  string
 }
 
 type SearchResult struct {
@@ -67,7 +69,13 @@ func Open(binPath, jsonPath string) (*Library, error) {
 		return nil, err
 	}
 
-	return &Library{Index: libIndex.Files, BinFile: f, Tokenizer: tkm}, nil
+	return &Library{
+		Index:     libIndex.Files,
+		BinFile:   f,
+		Tokenizer: tkm,
+		binPath:   binPath,
+		jsonPath:  jsonPath,
+	}, nil
 }
 
 //Close 
@@ -76,6 +84,29 @@ func (l *Library) Close() error {
         return l.BinFile.Close()
     }
     return nil
+}
+
+// AddFile appends a new file to the existing library on disk and updates the current library instance.
+func (l *Library) AddFile(name string, content []byte, metadata ...map[string]string) error {
+	if l.binPath == "" || l.jsonPath == "" {
+		return fmt.Errorf("library paths not set; cannot append")
+	}
+
+	packer, err := OpenPacker(l.binPath, l.jsonPath)
+	if err != nil {
+		return err
+	}
+	defer packer.Library.Close()
+
+	packer.AddFile(name, content, metadata...)
+	err = packer.Save(l.binPath, l.jsonPath)
+	if err != nil {
+		return err
+	}
+
+	// Update the local library's index
+	l.Index[name] = packer.Library.Index[name]
+	return nil
 }
 
 // GetContent retrieves and decodes the full text for a given key using ReadAt
