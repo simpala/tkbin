@@ -8,8 +8,9 @@ import (
 
 // Packer handles the creation of the library files
 type Packer struct {
-	Library   *Library
-	ImageData []byte
+	Library    *Library
+	ImageData  []byte
+	baseOffset int
 }
 
 func NewPacker(tokenizerID ...string) (*Packer, error) {
@@ -28,6 +29,7 @@ func NewPacker(tokenizerID ...string) (*Packer, error) {
 			Index:     make(map[string]FileEntry),
 			Tokenizer: adapter,
 		},
+		baseOffset: 0,
 	}, nil
 }
 
@@ -38,7 +40,28 @@ func NewPackerWithTokenizer(t Tokenizer) *Packer {
 			Index:     make(map[string]FileEntry),
 			Tokenizer: t,
 		},
+		baseOffset: 0,
 	}
+}
+
+// OpenPacker opens an existing library and prepares a Packer for appending new files.
+func OpenPacker(binPath, jsonPath string) (*Packer, error) {
+	lib, err := Open(binPath, jsonPath)
+	if err != nil {
+		return nil, err
+	}
+
+	maxOffset := 0
+	for _, entry := range lib.Index {
+		if end := entry.PixelStart + entry.PixelLength; end > maxOffset {
+			maxOffset = end
+		}
+	}
+
+	return &Packer{
+		Library:    lib,
+		baseOffset: maxOffset,
+	}, nil
 }
 
 // AddFile tokenizes a file and appends it to the internal buffer
@@ -59,7 +82,7 @@ func (p *Packer) AddFile(name string, content []byte, metadata ...map[string]str
 		}
 	}
 
-	startPixel := len(p.ImageData) / pixelSize
+	startPixel := p.baseOffset + (len(p.ImageData) / pixelSize)
 	p.ImageData = append(p.ImageData, fileData...)
 
 	var meta map[string]string
@@ -77,8 +100,17 @@ func (p *Packer) AddFile(name string, content []byte, metadata ...map[string]str
 
 // Save writes the binary and JSON to disk
 func (p *Packer) Save(binPath, jsonPath string) error {
+	p.Library.binPath = binPath
+	p.Library.jsonPath = jsonPath
+
 	// Write Binary
-	f, err := os.Create(binPath)
+	var f *os.File
+	var err error
+	if p.baseOffset > 0 {
+		f, err = os.OpenFile(binPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	} else {
+		f, err = os.Create(binPath)
+	}
 	if err != nil {
 		return err
 	}
@@ -88,6 +120,11 @@ func (p *Packer) Save(binPath, jsonPath string) error {
 	if err != nil {
 		return err
 	}
+
+	// Update baseOffset and clear ImageData for subsequent appends
+	pixelSize := p.Library.Tokenizer.TokenSize() * 4
+	p.baseOffset += len(p.ImageData) / pixelSize
+	p.ImageData = nil
 
 	// Write JSON
 	libIndex := LibraryIndex{
